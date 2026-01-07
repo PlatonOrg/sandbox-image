@@ -124,7 +124,7 @@ RUN mkdir -p ${NVM_DIR} /var/www/.npm/_logs && \
     nvm install ${NODE_VERSION}
 
 ENV PATH="/usr/local/nvm/versions/node/${NODE_VERSION}/bin:${PATH}"
-ENV PYTHON_PATH="/utils/libs/platon/:${PYTHON_PATH}"
+ENV PYTHONPATH="/utils/libs/platon/:${PYTHONPATH}"
 
 # Copy package.json separately for better caching
 COPY package.json /tmp/package.json
