@@ -98,12 +98,12 @@ ENV PATH="/utils/libs/:${PATH}" \
     PYTHONPATH="/utils/libs/"
 
 RUN ARCH_SUFFIX=$(arch | sed 's/x86_64/x64/' | sed 's/aarch64/aarch64/') && \
-    wget --progress=dot:giga "https://download.oracle.com/java/22/archive/jdk-22_linux-${ARCH_SUFFIX}_bin.tar.gz" -O /tmp/jdk-22.tar.gz && \
-    mkdir -p /usr/lib/jvm/jdk-22-oracle && \
-    tar -xzf /tmp/jdk-22.tar.gz -C /usr/lib/jvm/jdk-22-oracle --strip-components=1 && \
-    rm -f /tmp/jdk-22.tar.gz && \
-    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-22-oracle/bin/java 3 && \
-    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-22-oracle/bin/javac 3
+    wget --progress=dot:giga "https://download.oracle.com/java/26/latest/jdk-26_linux-${ARCH_SUFFIX}_bin.tar.gz" -O /tmp/jdk-26.tar.gz && \
+    mkdir -p /usr/lib/jvm/jdk-26-oracle && \
+    tar -xzf /tmp/jdk-26.tar.gz -C /usr/lib/jvm/jdk-26-oracle --strip-components=1 && \
+    rm -f /tmp/jdk-26.tar.gz && \
+    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-26-oracle/bin/java 3 && \
+    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-26-oracle/bin/javac 3
 
 # Download JUnit standalone jar (only once, latest version)
 RUN wget --progress=dot:giga \
@@ -114,6 +114,29 @@ RUN wget --progress=dot:giga \
 RUN wget --progress=dot:giga \
     https://repo1.maven.org/maven2/com/github/javaparser/javaparser-core/3.26.1/javaparser-core-3.26.1.jar \
     -O /utils/javaparser-core.jar
+
+# Install Scala 2.13.18 (compatible with Spark 4.x)
+ENV SCALA_VERSION=2.13.18
+RUN wget --progress=dot:giga \
+    https://github.com/scala/scala/releases/download/v${SCALA_VERSION}/scala-${SCALA_VERSION}.tgz \
+    -O /tmp/scala.tgz && \
+    tar -xzf /tmp/scala.tgz -C /usr/local && \
+    ln -sf /usr/local/scala-${SCALA_VERSION} /usr/local/scala && \
+    rm -f /tmp/scala.tgz
+
+ENV PATH="/usr/local/scala/bin:${PATH}"
+
+# Install Apache Spark 4.1.1 (pre-built with Scala 2.13, Hadoop 3)
+ENV SPARK_VERSION=4.1.1
+RUN wget --progress=dot:giga \
+    https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+    -O /tmp/spark.tgz && \
+    tar -xzf /tmp/spark.tgz -C /usr/local && \
+    ln -sf /usr/local/spark-${SPARK_VERSION}-bin-hadoop3 /usr/local/spark && \
+    rm -f /tmp/spark.tgz
+
+ENV SPARK_HOME="/usr/local/spark"
+ENV PATH="${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${PATH}"
 
 ENV NODE_VERSION=v20.13.1 \
     NVM_DIR=/usr/local/nvm
