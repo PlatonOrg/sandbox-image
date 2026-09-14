@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     build-essential \
     libssl-dev \
+    libsqlite3-dev \
     nasm \
     openssl \
     unzip \
