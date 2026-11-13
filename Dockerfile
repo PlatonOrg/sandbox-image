@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     build-essential \
     libssl-dev \
+    libsqlite3-dev \
     nasm \
     openssl \
     unzip \
@@ -90,20 +91,24 @@ RUN ARCH=$(arch | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/') && \
     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/java-17-openjdk-${ARCH}/bin/javac 2 && \
     ln -sf /usr/lib/jvm/java-17-openjdk-${ARCH} /usr/lib/jvm/java-17-openjdk
 
-ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk"
-
 # Create utils directory structure
 RUN mkdir -p /utils/libs
 ENV PATH="/utils/libs/:${PATH}" \
     PYTHONPATH="/utils/libs/"
 
+ARG JDK_MAJOR=27
+ARG JDK_VERSION=27.0.1
 RUN ARCH_SUFFIX=$(arch | sed 's/x86_64/x64/' | sed 's/aarch64/aarch64/') && \
-    wget --progress=dot:giga "https://download.oracle.com/java/22/archive/jdk-22_linux-${ARCH_SUFFIX}_bin.tar.gz" -O /tmp/jdk-22.tar.gz && \
-    mkdir -p /usr/lib/jvm/jdk-22-oracle && \
-    tar -xzf /tmp/jdk-22.tar.gz -C /usr/lib/jvm/jdk-22-oracle --strip-components=1 && \
-    rm -f /tmp/jdk-22.tar.gz && \
-    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-22-oracle/bin/java 3 && \
-    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-22-oracle/bin/javac 3
+    wget --progress=dot:giga "https://download.oracle.com/java/${JDK_MAJOR}/archive/jdk-${JDK_VERSION}_linux-${ARCH_SUFFIX}_bin.tar.gz" -O /tmp/jdk.tar.gz && \
+    mkdir -p /usr/lib/jvm/jdk-${JDK_MAJOR}-oracle && \
+    tar -xzf /tmp/jdk.tar.gz -C /usr/lib/jvm/jdk-${JDK_MAJOR}-oracle --strip-components=1 && \
+    rm -f /tmp/jdk.tar.gz && \
+    update-alternatives --install /usr/bin/java java /usr/lib/jvm/jdk-${JDK_MAJOR}-oracle/bin/java 3 && \
+    update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/jdk-${JDK_MAJOR}-oracle/bin/javac 3
+
+# Default JDK for everything relying on JAVA_HOME (Scala, Spark, ...).
+# OpenJDK 17 stays available at /usr/lib/jvm/java-17-openjdk.
+ENV JAVA_HOME="/usr/lib/jvm/jdk-${JDK_MAJOR}-oracle"
 
 # Download JUnit standalone jar (only once, latest version)
 RUN wget --progress=dot:giga \
@@ -115,6 +120,29 @@ RUN wget --progress=dot:giga \
     https://repo1.maven.org/maven2/com/github/javaparser/javaparser-core/3.26.1/javaparser-core-3.26.1.jar \
     -O /utils/javaparser-core.jar
 
+# Install Scala 2.13.18
+ENV SCALA_VERSION=2.13.18
+RUN wget --progress=dot:giga \
+    https://github.com/scala/scala/releases/download/v${SCALA_VERSION}/scala-${SCALA_VERSION}.tgz \
+    -O /tmp/scala.tgz && \
+    tar -xzf /tmp/scala.tgz -C /usr/local && \
+    ln -sf /usr/local/scala-${SCALA_VERSION} /usr/local/scala && \
+    rm -f /tmp/scala.tgz
+
+ENV PATH="/usr/local/scala/bin:${PATH}"
+
+# Install Apache Spark 4.3.0
+ENV SPARK_VERSION=4.3.0
+RUN wget --progress=dot:giga \
+    https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+    -O /tmp/spark.tgz && \
+    tar -xzf /tmp/spark.tgz -C /usr/local && \
+    ln -sf /usr/local/spark-${SPARK_VERSION}-bin-hadoop3 /usr/local/spark && \
+    rm -f /tmp/spark.tgz
+
+ENV SPARK_HOME="/usr/local/spark"
+ENV PATH="${SPARK_HOME}/bin:${SPARK_HOME}/sbin:${PATH}"
+
 ENV NODE_VERSION=v20.13.1 \
     NVM_DIR=/usr/local/nvm
 
@@ -124,6 +152,7 @@ RUN mkdir -p ${NVM_DIR} /var/www/.npm/_logs && \
     nvm install ${NODE_VERSION}
 
 ENV PATH="/usr/local/nvm/versions/node/${NODE_VERSION}/bin:${PATH}"
+ENV PYTHONPATH="/utils/libs/platon/:${PYTHONPATH}"
 
 # Copy package.json separately for better caching
 COPY package.json /tmp/package.json
